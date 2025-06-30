@@ -1,0 +1,64 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="Tank"
+    UpgradeCode="949A3340-E69A-424B-B559-D38F9FC8074B"
+    Language="1033"
+    Codepage="1252"
+    Version="0.1.0"
+    Manufacturer="arctan95"
+    InstallerVersion="200">
+
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Icon Id="TankIco" SourceFile=".\assets\icons\tank.ico" />
+    <WixVariable Id="WixUILicenseRtf" Value=".\wix\license.rtf" />
+    <Property Id="ARPPRODUCTICON" Value="TankIco" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <ui:WixUI Id="WixUI_Minimal" />
+
+    <Feature Id="ProductFeature" Title="ScreenSaverApp" Level="1">
+      <ComponentRef Id="TankExe" />
+      <ComponentRef Id="TankShortcut" />
+      <ComponentRef Id="ModifyPathEnv" />
+    </Feature>
+
+    <!-- Application binaries -->
+    <DirectoryRef Id="TankProgramFiles">
+      <Component Id="TankExe">
+        <File Id="TankExeFile" Source=".\target\release\tank.exe" Name="tank.exe" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="TankProgramMenu">
+      <!-- Application shortcut -->
+      <Component Id="TankShortcut" Guid="974BE7FE-6B7C-4B1B-8372-0F594D270DA8">
+        <Shortcut
+          Id="TankShortcutFile"
+          Name="Tank"
+          Description="The Operator plugging you into The Matrix"
+          Target="[TankProgramFiles]tank.exe" />
+        <RemoveFolder Id="TankProgramMenu" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Tank" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="TankProgramFiles">
+      <!-- Add to PATH -->
+      <Component Id="ModifyPathEnv" Guid="802a36bd-2260-44bf-bbb5-71ade1d61077" KeyPath="yes">
+        <Environment Id="PathEnv" Value="[TankProgramFiles]" Name="PATH" Permanent="no" Part="first" Action="set" System="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="TankProgramFiles" Name="Tank" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="TankProgramMenu" Name="Tank" />
+    </StandardDirectory>
+  </Package>
+</Wix>
