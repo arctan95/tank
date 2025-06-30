@@ -1,0 +1,21 @@
+[package]
+name = "tank"
+version = "0.1.0"
+authors = ["arctan95"]
+edition = "2021"
+license = "Apache-2.0"
+description = "The Operator plugging you into The Matrix"
+
+[package.metadata.bundle]
+name = "Tank"
+identifier = "io.github.arctan95.tank"
+icon = ["assets/icons/32x32.png", "assets/icons/128x128.png", "assets/icons/128x128@2x.png"]
+copyright = "Copyright (c) 2025 arctan95. All rights reserved."
+deb_depends = ["libwebkit2gtk-4.1-dev"]
+
+[dependencies]
+tao = "0.34"
+wry = "0.52"
+mime_guess = "2.0"
+chrono = "0.4"
+include_dir = "0.7"
