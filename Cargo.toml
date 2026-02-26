@@ -11,11 +11,15 @@ name = "Tank"
 identifier = "io.github.arctan95.tank"
 icon = ["assets/icons/32x32.png", "assets/icons/128x128.png", "assets/icons/128x128@2x.png"]
 copyright = "Copyright (c) 2025 arctan95. All rights reserved."
-deb_depends = ["libwebkit2gtk-4.1-dev"]
 
 [dependencies]
-tao = "0.34"
-wry = "0.52"
-mime_guess = "2.0"
 chrono = "0.4"
-include_dir = "0.7"
+env_logger = "0.11"
+wgpu = "28.0"
+winit = "0.30"
+pollster = "0.4"
+bytemuck = { version = "1.23", features = ["derive"] }
+encase = "0.12"
+glam = { version = "0.30", features = ["bytemuck", "encase"] }
+image = "0.24"
+anyhow = "1.0"
