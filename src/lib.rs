@@ -1,11 +1,13 @@
 use std::{borrow::Cow, sync::Arc, time::Instant};
 
-use anyhow::Context as _;
 use encase::{ShaderType, UniformBuffer};
-use glam::{IVec2, Mat2, Mat4, Vec2};
-use image::GenericImageView;
+use glam::{IVec2, Mat2, Mat4, Vec2, Vec3};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
+
+mod texture;
+
+use texture::Texture;
 
 const RENDER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const NUM_VERTICES_PER_QUAD: u32 = 6;
@@ -20,6 +22,8 @@ pub struct State {
     start_time: Instant,
     frames: i32,
     rain: RainPass,
+    bloom: BloomPass,
+    palette: PalettePass,
     end: EndPass,
 }
 
@@ -68,9 +72,11 @@ impl State {
             mapped_at_creation: false,
         });
 
-        let matrix_config = MatrixConfig::default();
-        let rain = RainPass::new(&device, &queue, &time_buffer, matrix_config)
+        let config = MatrixConfig::default();
+        let rain = RainPass::new(&device, &queue, &time_buffer, config)
             .expect("failed to create rain pass");
+        let bloom = BloomPass::new(&device, config);
+        let palette = PalettePass::new(&device, &time_buffer, config);
         let end = EndPass::new(&device, surface_config.format);
 
         let mut state = State {
@@ -83,6 +89,8 @@ impl State {
             start_time: Instant::now(),
             frames: 0,
             rain,
+            bloom,
+            palette,
             end,
         };
         state.rebuild_targets();
@@ -130,6 +138,8 @@ impl State {
             });
 
         self.rain.run(&mut encoder);
+        self.bloom.run(&mut encoder);
+        self.palette.run(&mut encoder);
         self.end.run(&mut encoder, &surface_view);
 
         self.queue.submit([encoder.finish()]);
@@ -141,7 +151,15 @@ impl State {
     fn rebuild_targets(&mut self) {
         let size = [self.surface_config.width, self.surface_config.height];
         self.rain.build(&self.device, &self.queue, size);
-        self.end.build(&self.device, self.rain.output_view());
+        self.bloom
+            .build(&self.device, size, self.rain.high_pass_view());
+        self.palette.build(
+            &self.device,
+            size,
+            self.rain.output_view(),
+            self.bloom.output_view(),
+        );
+        self.end.build(&self.device, self.palette.output_view());
     }
 
     fn write_time(&self) {
@@ -405,6 +423,10 @@ impl RainPass {
         &self.output.view
     }
 
+    fn high_pass_view(&self) -> &wgpu::TextureView {
+        &self.high_pass_output.view
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn create_render_bind_group(
         device: &wgpu::Device,
@@ -435,6 +457,308 @@ impl RainPass {
                 buffer_entry(8, cells_buffer),
             ],
         })
+    }
+}
+
+struct BloomPass {
+    enabled: bool,
+    bloom_size: f32,
+    blur_pipeline: wgpu::ComputePipeline,
+    combine_pipeline: wgpu::ComputePipeline,
+    h_blur_buffer: wgpu::Buffer,
+    v_blur_buffer: wgpu::Buffer,
+    combine_buffer: wgpu::Buffer,
+    sampler: wgpu::Sampler,
+    h_blur_pyramid: Vec<RenderTarget>,
+    v_blur_pyramid: Vec<RenderTarget>,
+    h_blur_bind_groups: Vec<wgpu::BindGroup>,
+    v_blur_bind_groups: Vec<wgpu::BindGroup>,
+    combine_bind_group: Option<wgpu::BindGroup>,
+    output: RenderTarget,
+    scaled_size: [u32; 2],
+}
+
+impl BloomPass {
+    const PYRAMID_HEIGHT: usize = 4;
+
+    fn new(device: &wgpu::Device, config: MatrixConfig) -> Self {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Bloom Linear Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let blur_shader = device
+            .create_shader_module(wgpu::include_wgsl!("../matrix/shaders/wgsl/bloomBlur.wgsl"));
+        let combine_shader = device.create_shader_module(wgpu::include_wgsl!(
+            "../matrix/shaders/wgsl/bloomCombine.wgsl"
+        ));
+        let blur_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Bloom Blur Pipeline"),
+            layout: None,
+            module: &blur_shader,
+            entry_point: Some("computeMain"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
+        let combine_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Bloom Combine Pipeline"),
+            layout: None,
+            module: &combine_shader,
+            entry_point: Some("computeMain"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
+
+        let h_blur_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Bloom Horizontal Blur Uniform Buffer"),
+            contents: &uniform_bytes(&BloomBlurConfigUniform {
+                bloom_radius: 2.0,
+                direction: Vec2::new(1.0, 0.0),
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let v_blur_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Bloom Vertical Blur Uniform Buffer"),
+            contents: &uniform_bytes(&BloomBlurConfigUniform {
+                bloom_radius: 2.0,
+                direction: Vec2::new(0.0, 1.0),
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let combine_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Bloom Combine Uniform Buffer"),
+            contents: &uniform_bytes(&BloomCombineConfigUniform {
+                pyramid_height: Self::PYRAMID_HEIGHT as f32,
+                bloom_strength: config.bloom_strength,
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        Self {
+            enabled: config.bloom_size > 0.0 && config.bloom_strength > 0.0,
+            bloom_size: config.bloom_size,
+            blur_pipeline,
+            combine_pipeline,
+            h_blur_buffer,
+            v_blur_buffer,
+            combine_buffer,
+            sampler,
+            h_blur_pyramid: Vec::new(),
+            v_blur_pyramid: Vec::new(),
+            h_blur_bind_groups: Vec::new(),
+            v_blur_bind_groups: Vec::new(),
+            combine_bind_group: None,
+            output: RenderTarget::new_compute(device, [1, 1], "Bloom Output"),
+            scaled_size: [1, 1],
+        }
+    }
+
+    fn build(
+        &mut self,
+        device: &wgpu::Device,
+        screen_size: [u32; 2],
+        high_pass: &wgpu::TextureView,
+    ) {
+        if !self.enabled {
+            self.output = RenderTarget::new_compute(device, [1, 1], "Bloom Disabled Output");
+            self.combine_bind_group = None;
+            return;
+        }
+
+        self.scaled_size = [
+            ((screen_size[0] as f32) * self.bloom_size).floor().max(1.0) as u32,
+            ((screen_size[1] as f32) * self.bloom_size).floor().max(1.0) as u32,
+        ];
+        self.h_blur_pyramid =
+            make_bloom_pyramid(device, self.scaled_size, "Bloom Horizontal Pyramid");
+        self.v_blur_pyramid =
+            make_bloom_pyramid(device, self.scaled_size, "Bloom Vertical Pyramid");
+        self.output = RenderTarget::new_compute(device, self.scaled_size, "Bloom Output");
+
+        self.h_blur_bind_groups.clear();
+        self.v_blur_bind_groups.clear();
+        for i in 0..Self::PYRAMID_HEIGHT {
+            let src_view = if i == 0 {
+                high_pass
+            } else {
+                &self.h_blur_pyramid[i - 1].view
+            };
+            self.h_blur_bind_groups.push(self.create_blur_bind_group(
+                device,
+                &self.h_blur_buffer,
+                src_view,
+                &self.h_blur_pyramid[i].view,
+            ));
+            self.v_blur_bind_groups.push(self.create_blur_bind_group(
+                device,
+                &self.v_blur_buffer,
+                &self.h_blur_pyramid[i].view,
+                &self.v_blur_pyramid[i].view,
+            ));
+        }
+
+        self.combine_bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Bloom Combine Bind Group"),
+            layout: &self.combine_pipeline.get_bind_group_layout(0),
+            entries: &[
+                buffer_entry(0, &self.combine_buffer),
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                texture_entry(2, &self.v_blur_pyramid[0].view),
+                texture_entry(3, &self.v_blur_pyramid[1].view),
+                texture_entry(4, &self.v_blur_pyramid[2].view),
+                texture_entry(5, &self.v_blur_pyramid[3].view),
+                texture_entry(6, &self.output.view),
+            ],
+        }));
+    }
+
+    fn run(&self, encoder: &mut wgpu::CommandEncoder) {
+        if !self.enabled {
+            return;
+        }
+
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Bloom Compute Pass"),
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&self.blur_pipeline);
+        for i in 0..Self::PYRAMID_HEIGHT {
+            let level_size = bloom_level_size(self.scaled_size, i);
+            let dispatch = [level_size[0].div_ceil(32), level_size[1], 1];
+            pass.set_bind_group(0, &self.h_blur_bind_groups[i], &[]);
+            pass.dispatch_workgroups(dispatch[0], dispatch[1], dispatch[2]);
+            pass.set_bind_group(0, &self.v_blur_bind_groups[i], &[]);
+            pass.dispatch_workgroups(dispatch[0], dispatch[1], dispatch[2]);
+        }
+
+        pass.set_pipeline(&self.combine_pipeline);
+        pass.set_bind_group(0, self.combine_bind_group.as_ref().unwrap(), &[]);
+        pass.dispatch_workgroups(self.scaled_size[0].div_ceil(32), self.scaled_size[1], 1);
+    }
+
+    fn output_view(&self) -> &wgpu::TextureView {
+        &self.output.view
+    }
+
+    fn create_blur_bind_group(
+        &self,
+        device: &wgpu::Device,
+        config_buffer: &wgpu::Buffer,
+        input: &wgpu::TextureView,
+        output: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Bloom Blur Bind Group"),
+            layout: &self.blur_pipeline.get_bind_group_layout(0),
+            entries: &[
+                buffer_entry(0, config_buffer),
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                texture_entry(2, input),
+                texture_entry(3, output),
+            ],
+        })
+    }
+}
+
+struct PalettePass {
+    pipeline: wgpu::ComputePipeline,
+    config_buffer: wgpu::Buffer,
+    palette_buffer: wgpu::Buffer,
+    sampler: wgpu::Sampler,
+    time_buffer: wgpu::Buffer,
+    bind_group: Option<wgpu::BindGroup>,
+    output: RenderTarget,
+    screen_size: [u32; 2],
+}
+
+impl PalettePass {
+    fn new(device: &wgpu::Device, time_buffer: &wgpu::Buffer, config: MatrixConfig) -> Self {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Palette Linear Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let shader = device.create_shader_module(wgpu::include_wgsl!(
+            "../matrix/shaders/wgsl/palettePass.wgsl"
+        ));
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Palette Pipeline"),
+            layout: None,
+            module: &shader,
+            entry_point: Some("computeMain"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
+        let config_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Palette Config Uniform Buffer"),
+            contents: &uniform_bytes(&config.to_palette_uniform()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let palette_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Palette Uniform Buffer"),
+            contents: bytemuck::cast_slice(&make_default_palette()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        Self {
+            pipeline,
+            config_buffer,
+            palette_buffer,
+            sampler,
+            time_buffer: time_buffer.clone(),
+            bind_group: None,
+            output: RenderTarget::new_compute(device, [1, 1], "Palette Output"),
+            screen_size: [1, 1],
+        }
+    }
+
+    fn build(
+        &mut self,
+        device: &wgpu::Device,
+        size: [u32; 2],
+        primary: &wgpu::TextureView,
+        bloom: &wgpu::TextureView,
+    ) {
+        self.screen_size = size;
+        self.output = RenderTarget::new_compute(device, size, "Palette Output");
+        self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Palette Bind Group"),
+            layout: &self.pipeline.get_bind_group_layout(0),
+            entries: &[
+                buffer_entry(0, &self.config_buffer),
+                buffer_entry(1, &self.palette_buffer),
+                buffer_entry(2, &self.time_buffer),
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                texture_entry(4, primary),
+                texture_entry(5, bloom),
+                texture_entry(6, &self.output.view),
+            ],
+        }));
+    }
+
+    fn run(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Palette Compute Pass"),
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, self.bind_group.as_ref().unwrap(), &[]);
+        pass.dispatch_workgroups(self.screen_size[0].div_ceil(32), self.screen_size[1], 1);
+    }
+
+    fn output_view(&self) -> &wgpu::TextureView {
+        &self.output.view
     }
 }
 
@@ -529,6 +853,35 @@ struct RenderTarget {
 
 impl RenderTarget {
     fn new(device: &wgpu::Device, size: [u32; 2], label: &str) -> Self {
+        Self::with_usage(
+            device,
+            size,
+            label,
+            wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        )
+    }
+
+    fn new_compute(device: &wgpu::Device, size: [u32; 2], label: &str) -> Self {
+        Self::with_usage(
+            device,
+            size,
+            label,
+            wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::STORAGE_BINDING,
+        )
+    }
+
+    fn with_usage(
+        device: &wgpu::Device,
+        size: [u32; 2],
+        label: &str,
+        usage: wgpu::TextureUsages,
+    ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
@@ -540,81 +893,11 @@ impl RenderTarget {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: RENDER_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage,
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         Self { view }
-    }
-}
-
-struct Texture {
-    view: wgpu::TextureView,
-}
-
-impl Texture {
-    fn from_bytes(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        bytes: &[u8],
-        label: &str,
-    ) -> anyhow::Result<Self> {
-        let img =
-            image::load_from_memory(bytes).with_context(|| format!("failed to load {label}"))?;
-        let rgba = img.flipv().to_rgba8();
-        let dimensions = img.dimensions();
-        Self::from_rgba(device, queue, &rgba, dimensions, label)
-    }
-
-    fn empty(device: &wgpu::Device, queue: &wgpu::Queue, label: &str) -> Self {
-        Self::from_rgba(device, queue, &[255, 255, 255, 255], (1, 1), label).unwrap()
-    }
-
-    fn from_rgba(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        rgba: &[u8],
-        dimensions: (u32, u32),
-        label: &str,
-    ) -> anyhow::Result<Self> {
-        let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * dimensions.0),
-                rows_per_image: Some(dimensions.1),
-            },
-            size,
-        );
-        Ok(Self {
-            view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
-        })
     }
 }
 
@@ -646,6 +929,14 @@ struct MatrixConfig {
     loops: bool,
     skip_intro: bool,
     high_pass_threshold: f32,
+    bloom_size: f32,
+    bloom_strength: f32,
+    dither_magnitude: f32,
+    background_color: Vec3,
+    cursor_color: Vec3,
+    glint_color: Vec3,
+    cursor_intensity: f32,
+    glint_intensity: f32,
 }
 
 impl Default for MatrixConfig {
@@ -677,6 +968,14 @@ impl Default for MatrixConfig {
             loops: false,
             skip_intro: true,
             high_pass_threshold: 0.1,
+            bloom_size: 0.4,
+            bloom_strength: 0.7,
+            dither_magnitude: 0.05,
+            background_color: hsl_to_rgb(0.0, 0.0, 0.0),
+            cursor_color: hsl_to_rgb(0.242, 1.0, 0.73),
+            glint_color: hsl_to_rgb(0.0, 0.0, 1.0),
+            cursor_intensity: 2.0,
+            glint_intensity: 1.0,
         }
     }
 }
@@ -737,6 +1036,17 @@ impl MatrixConfig {
             high_pass_threshold: self.high_pass_threshold,
         }
     }
+
+    fn to_palette_uniform(self) -> PaletteConfigUniform {
+        PaletteConfigUniform {
+            dither_magnitude: self.dither_magnitude,
+            background_color: self.background_color,
+            cursor_color: self.cursor_color,
+            glint_color: self.glint_color,
+            cursor_intensity: self.cursor_intensity,
+            glint_intensity: self.glint_intensity,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ShaderType)]
@@ -794,6 +1104,28 @@ struct SceneUniform {
     screen_size: Vec2,
     camera: Mat4,
     transform: Mat4,
+}
+
+#[derive(Clone, Copy, ShaderType)]
+struct BloomBlurConfigUniform {
+    bloom_radius: f32,
+    direction: Vec2,
+}
+
+#[derive(Clone, Copy, ShaderType)]
+struct BloomCombineConfigUniform {
+    pyramid_height: f32,
+    bloom_strength: f32,
+}
+
+#[derive(Clone, Copy, ShaderType)]
+struct PaletteConfigUniform {
+    dither_magnitude: f32,
+    background_color: Vec3,
+    cursor_color: Vec3,
+    glint_color: Vec3,
+    cursor_intensity: f32,
+    glint_intensity: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -935,6 +1267,67 @@ fn texture_entry(binding: u32, view: &wgpu::TextureView) -> wgpu::BindGroupEntry
         binding,
         resource: wgpu::BindingResource::TextureView(view),
     }
+}
+
+fn make_bloom_pyramid(device: &wgpu::Device, size: [u32; 2], label: &str) -> Vec<RenderTarget> {
+    (0..BloomPass::PYRAMID_HEIGHT)
+        .map(|level| RenderTarget::new_compute(device, bloom_level_size(size, level), label))
+        .collect()
+}
+
+fn bloom_level_size(size: [u32; 2], level: usize) -> [u32; 2] {
+    let scale = 2_u32.pow(level as u32);
+    [(size[0] / scale).max(1), (size[1] / scale).max(1)]
+}
+
+fn make_default_palette() -> [[f32; 4]; 512] {
+    let entries = [
+        (hsl_to_rgb(0.3, 0.9, 0.0), 0.0),
+        (hsl_to_rgb(0.3, 0.9, 0.2), 0.2),
+        (hsl_to_rgb(0.3, 0.9, 0.7), 0.7),
+        (hsl_to_rgb(0.3, 0.9, 0.8), 0.8),
+    ];
+    make_palette(&entries)
+}
+
+fn make_palette(entries: &[(Vec3, f32)]) -> [[f32; 4]; 512] {
+    let mut palette = [[0.0; 4]; 512];
+    let mut points: Vec<(Vec3, usize)> = entries
+        .iter()
+        .map(|(color, at)| (*color, (at.clamp(0.0, 1.0) * 511.0).floor() as usize))
+        .collect();
+    points.sort_by_key(|(_, index)| *index);
+
+    let first = points[0].0;
+    let last = points[points.len() - 1].0;
+    points.insert(0, (first, 0));
+    points.push((last, 511));
+
+    for window in points.windows(2) {
+        let (from_color, from_index) = window[0];
+        let (to_color, to_index) = window[1];
+        let diff = to_index.saturating_sub(from_index);
+        if diff == 0 {
+            palette[from_index] = [from_color.x, from_color.y, from_color.z, 0.0];
+            continue;
+        }
+        for i in 0..=diff {
+            let ratio = i as f32 / diff as f32;
+            let color = from_color * (1.0 - ratio) + to_color * ratio;
+            palette[from_index + i] = [color.x, color.y, color.z, 0.0];
+        }
+    }
+
+    palette
+}
+
+fn hsl_to_rgb(hue: f32, saturation: f32, lightness: f32) -> Vec3 {
+    let a = saturation * lightness.min(1.0 - lightness);
+    let f = |n: f32| {
+        let k = (n + hue * 12.0) % 12.0;
+        lightness - a * (-1.0_f32).max((k - 3.0).min(9.0 - k).min(1.0))
+    };
+    Vec3::new(f(0.0), f(8.0), f(4.0))
 }
 
 fn additive_blend() -> wgpu::BlendState {
