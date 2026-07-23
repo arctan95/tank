@@ -232,13 +232,24 @@ impl RainPass {
             ..Default::default()
         });
 
-        let glyph_msdf = Texture::from_bytes(
-            device,
-            queue,
-            include_bytes!("../matrix/assets/matrixcode_msdf.png"),
-            "Matrix Code MSDF",
-        )?;
-        let empty_texture = Texture::empty(device, queue, "Empty Rain Texture");
+        let font = config.font.asset();
+        let glyph_msdf =
+            Texture::from_bytes(device, queue, font.glyph_msdf_bytes, font.glyph_msdf_label)?;
+        let glint_msdf = if let Some((bytes, label)) = font.glint_msdf {
+            Texture::from_bytes(device, queue, bytes, label)?
+        } else {
+            Texture::empty(device, queue, "Empty Glint MSDF Texture")
+        };
+        let base_texture = if let Some(texture) = config.base_texture {
+            Texture::from_bytes(device, queue, texture.bytes(), texture.label())?
+        } else {
+            Texture::empty(device, queue, "Empty Base Texture")
+        };
+        let glint_texture = if let Some(texture) = config.glint_texture {
+            Texture::from_bytes(device, queue, texture.bytes(), texture.label())?
+        } else {
+            Texture::empty(device, queue, "Empty Glint Texture")
+        };
 
         let intro_shader =
             shader_from_wgsl(device, "Rain Intro Shader", rain_shader(RainStage::Intro));
@@ -328,7 +339,9 @@ impl RainPass {
             &scene_buffer,
             &linear_sampler,
             &glyph_msdf.view,
-            &empty_texture.view,
+            &glint_msdf.view,
+            &base_texture.view,
+            &glint_texture.view,
             &cells_buffer,
         );
 
@@ -436,7 +449,9 @@ impl RainPass {
         scene_buffer: &wgpu::Buffer,
         sampler: &wgpu::Sampler,
         glyph_msdf_view: &wgpu::TextureView,
-        empty_texture_view: &wgpu::TextureView,
+        glint_msdf_view: &wgpu::TextureView,
+        base_texture_view: &wgpu::TextureView,
+        glint_texture_view: &wgpu::TextureView,
         cells_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -451,9 +466,9 @@ impl RainPass {
                     resource: wgpu::BindingResource::Sampler(sampler),
                 },
                 texture_entry(4, glyph_msdf_view),
-                texture_entry(5, glyph_msdf_view),
-                texture_entry(6, empty_texture_view),
-                texture_entry(7, empty_texture_view),
+                texture_entry(5, glint_msdf_view),
+                texture_entry(6, base_texture_view),
+                texture_entry(7, glint_texture_view),
                 buffer_entry(8, cells_buffer),
             ],
         })
@@ -902,7 +917,145 @@ impl RenderTarget {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
+enum FontKind {
+    Coptic,
+    Gothic,
+    MatrixCode,
+    Megacity,
+    Resurrections,
+    HuberfishA,
+    HuberfishD,
+    GtargTenretniolleh,
+    GtargAlientext,
+    Neomatrixology,
+}
+
+#[derive(Clone, Copy)]
+struct FontAsset {
+    glyph_msdf_bytes: &'static [u8],
+    glyph_msdf_label: &'static str,
+    glint_msdf: Option<(&'static [u8], &'static str)>,
+    glyph_sequence_length: f32,
+    glyph_texture_grid_size: IVec2,
+}
+
+impl FontKind {
+    fn asset(self) -> FontAsset {
+        match self {
+            Self::Coptic => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/coptic_msdf.png"),
+                glyph_msdf_label: "Coptic MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 32.0,
+                glyph_texture_grid_size: IVec2::new(8, 8),
+            },
+            Self::Gothic => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/gothic_msdf.png"),
+                glyph_msdf_label: "Gothic MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 27.0,
+                glyph_texture_grid_size: IVec2::new(8, 8),
+            },
+            Self::MatrixCode => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/matrixcode_msdf.png"),
+                glyph_msdf_label: "Matrix Code MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 57.0,
+                glyph_texture_grid_size: IVec2::new(8, 8),
+            },
+            Self::Megacity => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/megacity_msdf.png"),
+                glyph_msdf_label: "Megacity MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 64.0,
+                glyph_texture_grid_size: IVec2::new(8, 8),
+            },
+            Self::Resurrections => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/resurrections_msdf.png"),
+                glyph_msdf_label: "Resurrections MSDF",
+                glint_msdf: Some((
+                    include_bytes!("../matrix/assets/resurrections_glint_msdf.png"),
+                    "Resurrections Glint MSDF",
+                )),
+                glyph_sequence_length: 135.0,
+                glyph_texture_grid_size: IVec2::new(13, 12),
+            },
+            Self::HuberfishA => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/huberfish_a_msdf.png"),
+                glyph_msdf_label: "Huberfish A MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 34.0,
+                glyph_texture_grid_size: IVec2::new(6, 6),
+            },
+            Self::HuberfishD => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/huberfish_d_msdf.png"),
+                glyph_msdf_label: "Huberfish D MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 34.0,
+                glyph_texture_grid_size: IVec2::new(6, 6),
+            },
+            Self::GtargTenretniolleh => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/gtarg_tenretniolleh_msdf.png"),
+                glyph_msdf_label: "GTArg Tenretniolleh MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 36.0,
+                glyph_texture_grid_size: IVec2::new(6, 6),
+            },
+            Self::GtargAlientext => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/gtarg_alientext_msdf.png"),
+                glyph_msdf_label: "GTArg Alientext MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 38.0,
+                glyph_texture_grid_size: IVec2::new(8, 5),
+            },
+            Self::Neomatrixology => FontAsset {
+                glyph_msdf_bytes: include_bytes!("../matrix/assets/neomatrixology_msdf.png"),
+                glyph_msdf_label: "Neomatrixology MSDF",
+                glint_msdf: None,
+                glyph_sequence_length: 12.0,
+                glyph_texture_grid_size: IVec2::new(4, 4),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+enum TextureKind {
+    Sand,
+    Pixels,
+    Mesh,
+    Metal,
+}
+
+impl TextureKind {
+    fn bytes(self) -> &'static [u8] {
+        match self {
+            Self::Sand => include_bytes!("../matrix/assets/sand.png"),
+            Self::Pixels => include_bytes!("../matrix/assets/pixel_grid.png"),
+            Self::Mesh => include_bytes!("../matrix/assets/mesh.png"),
+            Self::Metal => include_bytes!("../matrix/assets/metal.png"),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Sand => "Sand Texture",
+            Self::Pixels => "Pixel Grid Texture",
+            Self::Mesh => "Mesh Texture",
+            Self::Metal => "Metal Texture",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 struct MatrixConfig {
+    font: FontKind,
+    base_texture: Option<TextureKind>,
+    glint_texture: Option<TextureKind>,
+    glyph_flip: bool,
+    glyph_rotation_degrees: f32,
     animation_speed: f32,
     glyph_sequence_length: f32,
     glyph_texture_grid_size: IVec2,
@@ -941,10 +1094,16 @@ struct MatrixConfig {
 
 impl Default for MatrixConfig {
     fn default() -> Self {
+        let font = FontKind::MatrixCode.asset();
         Self {
+            font: FontKind::MatrixCode,
+            base_texture: None,
+            glint_texture: None,
+            glyph_flip: false,
+            glyph_rotation_degrees: 0.0,
             animation_speed: 1.0,
-            glyph_sequence_length: 57.0,
-            glyph_texture_grid_size: IVec2::new(8, 8),
+            glyph_sequence_length: font.glyph_sequence_length,
+            glyph_texture_grid_size: font.glyph_texture_grid_size,
             glyph_height_to_width: 1.0,
             brightness_threshold: 0.0,
             brightness_override: 0.0,
@@ -991,7 +1150,8 @@ impl MatrixConfig {
 
     fn to_rain_uniform(self) -> RainConfigUniform {
         let grid_size = self.grid_size();
-        let glyph_transform = Mat2::IDENTITY;
+        let glyph_transform = Mat2::from_angle(self.glyph_rotation_degrees.to_radians())
+            * Mat2::from_diagonal(Vec2::new(if self.glyph_flip { -1.0 } else { 1.0 }, 1.0));
         let slant_scale = 1.0 / ((2.0 * self.slant).sin().abs() * (2.0_f32.sqrt() - 1.0) + 1.0);
         RainConfigUniform {
             animation_speed: self.animation_speed,
@@ -1020,8 +1180,8 @@ impl MatrixConfig {
             base_contrast: self.base_contrast,
             glint_brightness: self.glint_brightness,
             glint_contrast: self.glint_contrast,
-            has_base_texture: 0,
-            has_glint_texture: 0,
+            has_base_texture: self.base_texture.is_some() as i32,
+            has_glint_texture: self.glint_texture.is_some() as i32,
             glyph_vertical_spacing: self.glyph_vertical_spacing,
             glyph_edge_crop: self.glyph_edge_crop,
             is_polar: 0,
