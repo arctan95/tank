@@ -6,7 +6,7 @@ use winit::{
     application::ApplicationHandler,
     event::{ElementState, KeyEvent, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    keyboard::{Key, NamedKey},
+    keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
     window::{Fullscreen, Window, WindowId},
 };
 
@@ -68,30 +68,39 @@ impl ApplicationHandler for App {
                 event:
                     KeyEvent {
                         logical_key: key,
+                        physical_key,
                         state: ElementState::Pressed,
                         ..
                     },
                 ..
-            } => {
-                match key {
-                    Key::Named(NamedKey::Escape) => event_loop.exit(),
-                    Key::Character(c) => match c.as_str() {
-                        "q" | "Q" => event_loop.exit(),
-                        "`" => {
-                            // state.toggle_skip_intro();
-                            state.get_window().request_redraw();
-                        }
-                        n if n.parse::<usize>().is_ok() => {
-                            if let Some(&_version) = VERSIONS.get(n.parse::<usize>().unwrap()) {
-                                // state.set_version(version.to_string());
-                                state.get_window().request_redraw();
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
+            } => match (physical_key, key) {
+                (_, Key::Named(NamedKey::Escape)) => event_loop.exit(),
+                (_, Key::Character(c)) if matches!(c.as_str(), "q" | "Q") => event_loop.exit(),
+                (PhysicalKey::Code(KeyCode::Backquote), _) => {
+                    state.toggle_skip_intro();
+                    state.get_window().request_redraw();
                 }
-            }
+                (PhysicalKey::Code(code), _) => {
+                    let index = match code {
+                        KeyCode::Digit0 => Some(0),
+                        KeyCode::Digit1 => Some(1),
+                        KeyCode::Digit2 => Some(2),
+                        KeyCode::Digit3 => Some(3),
+                        KeyCode::Digit4 => Some(4),
+                        KeyCode::Digit5 => Some(5),
+                        KeyCode::Digit6 => Some(6),
+                        KeyCode::Digit7 => Some(7),
+                        KeyCode::Digit8 => Some(8),
+                        KeyCode::Digit9 => Some(9),
+                        _ => None,
+                    };
+                    if let Some(&version) = index.and_then(|index| VERSIONS.get(index)) {
+                        state.set_version(version);
+                        state.get_window().request_redraw();
+                    }
+                }
+                _ => {}
+            },
             _ => (),
         }
     }
