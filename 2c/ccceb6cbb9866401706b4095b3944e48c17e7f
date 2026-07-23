@@ -1,0 +1,21 @@
+src/lib.rs
+  s_a5cc096b41018e::t_42426e61b9c5e8 51-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "2cccceb6cbb9866401706b4095b3944e48c17e7f",
+  "prompts": {},
+  "sessions": {
+    "s_a5cc096b41018e": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a62424ae69272e9f342be3f",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": "arctan95 <jaeqentan@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
