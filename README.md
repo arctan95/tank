@@ -23,14 +23,17 @@ sudo xattr -rd com.apple.quarantine /Applications/Tank.app
 
 ## Operations
 
-- `0-9`: Load a specific Matrix instance.
+- `0-9`: Switch between Matrix versions.
 - `~`: Skip the loading sequence and dive right in.
+- `R`: Reload the default Matrix version.
+- `E`: Cycle visual effects.
+- `D/F3`: Toggle debug view.
 - `Escape/Q`: Unplug from The Matrix.
 
 ## Roadmap
 
 - [ ] Implement the “dialing” visualization at the opening of The Matrix.
-- [ ] Port to a native WGPU-based renderer
+- [x] Port to a native WGPU-based renderer
 
 
 ## License
