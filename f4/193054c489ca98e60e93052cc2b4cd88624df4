@@ -1,0 +1,22 @@
+README.md
+  s_c4f3482643bfff::t_314b63a5ca35e3 26-28
+  s_c4f3482643bfff::t_6217277d007df4 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f4193054c489ca98e60e93052cc2b4cd88624df4",
+  "prompts": {},
+  "sessions": {
+    "s_c4f3482643bfff": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a6378c3e69272e9f342ceeb",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
