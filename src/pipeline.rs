@@ -1,6 +1,6 @@
 use crate::{
     config::{EffectKind, MatrixConfig},
-    passes::{BloomPass, EndPass, PalettePass, RainPass},
+    passes::{BloomPass, EndPass, MirrorPass, PalettePass, RainPass},
 };
 
 pub(crate) struct MatrixPipeline {
@@ -12,6 +12,7 @@ pub(crate) struct MatrixPipeline {
 
 enum EffectPass {
     None,
+    Mirror(MirrorPass),
     Palette(PalettePass),
 }
 
@@ -28,7 +29,7 @@ impl MatrixPipeline {
             EffectKind::Plain | EffectKind::Palette => {
                 EffectPass::Palette(PalettePass::new(device, time_buffer, config))
             }
-            EffectKind::Mirror => anyhow::bail!("mirror effect pass is not implemented yet"),
+            EffectKind::Mirror => EffectPass::Mirror(MirrorPass::new(device, queue, time_buffer)),
         };
 
         Ok(Self {
@@ -44,6 +45,16 @@ impl MatrixPipeline {
         self.bloom.build(device, size, self.rain.high_pass_view());
         let output_view = match &mut self.effect {
             EffectPass::None => self.rain.output_view(),
+            EffectPass::Mirror(mirror) => {
+                mirror.build(
+                    device,
+                    queue,
+                    size,
+                    self.rain.output_view(),
+                    self.bloom.output_view(),
+                );
+                mirror.output_view()
+            }
             EffectPass::Palette(palette) => {
                 palette.build(
                     device,
@@ -62,8 +73,15 @@ impl MatrixPipeline {
         self.bloom.run(encoder);
         match &self.effect {
             EffectPass::None => {}
+            EffectPass::Mirror(mirror) => mirror.run(encoder),
             EffectPass::Palette(palette) => palette.run(encoder),
         }
         self.end.run(encoder, surface_view);
+    }
+
+    pub(crate) fn record_touch(&mut self, queue: &wgpu::Queue, position: [f32; 2], seconds: f32) {
+        if let EffectPass::Mirror(mirror) = &mut self.effect {
+            mirror.record_touch(queue, position, seconds);
+        }
     }
 }

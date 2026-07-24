@@ -4,7 +4,7 @@ use chrono::Local;
 use tank::State;
 use winit::{
     application::ApplicationHandler,
-    event::{ElementState, KeyEvent, WindowEvent},
+    event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
     window::{Fullscreen, Window, WindowId},
@@ -63,6 +63,16 @@ impl ApplicationHandler for App {
                 // Reconfigures the size of the surface. We do not re-render
                 // here as this event is always followed up by redraw request.
                 state.resize(size);
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                state.set_cursor_position(position);
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
+                state.record_cursor_touch();
             }
             WindowEvent::KeyboardInput {
                 event:

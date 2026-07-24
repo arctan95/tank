@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use encase::ShaderType;
-use winit::window::Window;
+use winit::{dpi::PhysicalPosition, window::Window};
 
 use crate::{
     config::MatrixConfig,
@@ -18,6 +18,7 @@ pub struct State {
     time_buffer: wgpu::Buffer,
     start_time: Instant,
     frames: i32,
+    cursor_position: Option<PhysicalPosition<f64>>,
     config: MatrixConfig,
     pipeline: MatrixPipeline,
 }
@@ -86,6 +87,7 @@ impl State {
             time_buffer,
             start_time: Instant::now(),
             frames: 0,
+            cursor_position: None,
             config,
             pipeline,
         };
@@ -112,8 +114,10 @@ impl State {
 
     pub fn set_version(&mut self, version: &str) {
         let skip_intro = self.config.skip_intro;
+        let effect = self.config.effect;
         let mut config = MatrixConfig::for_version(version);
         config.skip_intro = skip_intro;
+        config.effect = effect;
         self.apply_config(config)
             .expect("failed to rebuild renderer for matrix version");
     }
@@ -123,6 +127,30 @@ impl State {
         config.skip_intro = !config.skip_intro;
         self.apply_config(config)
             .expect("failed to rebuild renderer for intro toggle");
+    }
+
+    pub fn set_cursor_position(&mut self, position: PhysicalPosition<f64>) {
+        self.cursor_position = Some(position);
+    }
+
+    pub fn record_cursor_touch(&mut self) {
+        let Some(position) = self.cursor_position else {
+            return;
+        };
+        let width = self.surface_config.width as f32;
+        let height = self.surface_config.height as f32;
+        if width == 0.0 || height == 0.0 {
+            return;
+        }
+        let normalized = [
+            (position.x as f32 / width).clamp(0.0, 1.0),
+            (position.y as f32 / height).clamp(0.0, 1.0),
+        ];
+        self.pipeline.record_touch(
+            &self.queue,
+            normalized,
+            self.start_time.elapsed().as_secs_f32(),
+        );
     }
 
     fn reset_time(&mut self) {
