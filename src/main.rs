@@ -102,6 +102,10 @@ impl ApplicationHandler for App {
                     state.cycle_effect();
                     state.get_window().request_redraw();
                 }
+                (PhysicalKey::Code(KeyCode::KeyR), _) => {
+                    state.set_version("classic");
+                    state.get_window().request_redraw();
+                }
                 (PhysicalKey::Code(code), _) => {
                     let index = match code {
                         KeyCode::Digit0 => Some(0),
