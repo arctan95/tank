@@ -219,6 +219,13 @@ impl EffectKind {
     pub(crate) fn is_none(self) -> bool {
         matches!(self, Self::None)
     }
+
+    pub(crate) fn next_visual(self) -> Self {
+        match self {
+            Self::Mirror => Self::Palette,
+            _ => Self::Mirror,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

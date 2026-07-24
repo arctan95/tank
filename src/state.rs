@@ -4,7 +4,7 @@ use encase::ShaderType;
 use winit::{dpi::PhysicalPosition, window::Window};
 
 use crate::{
-    config::MatrixConfig,
+    config::{EffectKind, MatrixConfig},
     gpu::{uniform_bytes, uniform_size},
     pipeline::MatrixPipeline,
 };
@@ -19,6 +19,7 @@ pub struct State {
     start_time: Instant,
     frames: i32,
     cursor_position: Option<PhysicalPosition<f64>>,
+    debug_return_effect: EffectKind,
     config: MatrixConfig,
     pipeline: MatrixPipeline,
 }
@@ -88,6 +89,7 @@ impl State {
             start_time: Instant::now(),
             frames: 0,
             cursor_position: None,
+            debug_return_effect: config.effect,
             config,
             pipeline,
         };
@@ -127,6 +129,33 @@ impl State {
         config.skip_intro = !config.skip_intro;
         self.apply_config(config)
             .expect("failed to rebuild renderer for intro toggle");
+    }
+
+    pub fn toggle_debug_effect(&mut self) {
+        let mut config = self.config;
+        if config.effect.is_none() {
+            config.effect = self.debug_return_effect;
+        } else {
+            self.debug_return_effect = config.effect;
+            config.effect = EffectKind::None;
+        }
+        self.apply_config(config)
+            .expect("failed to rebuild renderer for debug effect toggle");
+    }
+
+    pub fn cycle_effect(&mut self) {
+        let effect = if self.config.effect.is_none() {
+            self.debug_return_effect
+        } else {
+            self.config.effect
+        }
+        .next_visual();
+
+        self.debug_return_effect = effect;
+        let mut config = self.config;
+        config.effect = effect;
+        self.apply_config(config)
+            .expect("failed to rebuild renderer for effect cycle");
     }
 
     pub fn set_cursor_position(&mut self, position: PhysicalPosition<f64>) {

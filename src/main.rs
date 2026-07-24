@@ -90,6 +90,18 @@ impl ApplicationHandler for App {
                     state.toggle_skip_intro();
                     state.get_window().request_redraw();
                 }
+                (PhysicalKey::Code(KeyCode::KeyD), _) => {
+                    state.toggle_debug_effect();
+                    state.get_window().request_redraw();
+                }
+                (PhysicalKey::Code(KeyCode::F3), _) => {
+                    state.toggle_debug_effect();
+                    state.get_window().request_redraw();
+                }
+                (PhysicalKey::Code(KeyCode::KeyE), _) => {
+                    state.cycle_effect();
+                    state.get_window().request_redraw();
+                }
                 (PhysicalKey::Code(code), _) => {
                     let index = match code {
                         KeyCode::Digit0 => Some(0),
