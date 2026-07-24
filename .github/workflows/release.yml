@@ -38,9 +38,9 @@ jobs:
              --window-pos 200 120 \
              --window-size 800 400 \
              --icon-size 100 \
-             --icon "Tank.app" 200 190 \
+             --icon "Tank.app" 250 190 \
              --hide-extension "Tank.app" \
-             --app-drop-link 600 185 \
+             --app-drop-link 550 190 \
              "Tank-Installer.dmg" \
              "Tank.app"
 
@@ -51,9 +51,9 @@ jobs:
              --window-pos 200 120 \
              --window-size 800 400 \
              --icon-size 100 \
-             --icon "Tank.app" 200 190 \
+             --icon "Tank.app" 250 190 \
              --hide-extension "Tank.app" \
-             --app-drop-link 600 185 \
+             --app-drop-link 550 190 \
              "Tank-Installer.dmg" \
              "Tank.app"
       - name: Get Tag Name
@@ -106,9 +106,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install dependencies
-        run: |
-          sudo apt-get install libwebkit2gtk-4.1-dev -y
-          cargo install cargo-bundle
+        run: cargo install cargo-bundle
       - name: Bundle
         run: cargo bundle --release --target=x86_64-unknown-linux-gnu --format=deb
       - name: Get Tag Name
