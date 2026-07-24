@@ -21,9 +21,9 @@ jobs:
       - name: Install ARM target
         run: rustup update && rustup target add aarch64-apple-darwin && rustup target add x86_64-apple-darwin
       - name: Bundle X64
-        run: cargo bundle --release --target=x86_64-apple-darwin
+        run: cargo bundle --release --bin tank --target=x86_64-apple-darwin
       - name: Bundle ARM
-        run: cargo bundle --release --target=aarch64-apple-darwin
+        run: cargo bundle --release --bin tank --target=aarch64-apple-darwin
       - name: Make DMG
         uses: nick-fields/retry@v3
         with:
@@ -38,9 +38,9 @@ jobs:
              --window-pos 200 120 \
              --window-size 800 400 \
              --icon-size 100 \
-             --icon "Tank.app" 200 190 \
+             --icon "Tank.app" 250 190 \
              --hide-extension "Tank.app" \
-             --app-drop-link 600 185 \
+             --app-drop-link 550 190 \
              "Tank-Installer.dmg" \
              "Tank.app"
 
@@ -51,9 +51,9 @@ jobs:
              --window-pos 200 120 \
              --window-size 800 400 \
              --icon-size 100 \
-             --icon "Tank.app" 200 190 \
+             --icon "Tank.app" 250 190 \
              --hide-extension "Tank.app" \
-             --app-drop-link 600 185 \
+             --app-drop-link 550 190 \
              "Tank-Installer.dmg" \
              "Tank.app"
       - name: Get Tag Name
@@ -88,10 +88,10 @@ jobs:
           echo "TAG_NAME=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
       - name: Create msi installer
         run: |
-          cargo build --release
+          cargo build --release --bin tank
           wix extension add WixToolset.UI.wixext/4.0.5 WixToolset.Util.wixext/4.0.5
           wix build -arch "x64" -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
-          -out "target/Tank-${{ env.TAG_NAME }}-installer-x64.msi" "wix/tank.wxs"
+          -out "target/Tank-${{ env.TAG_NAME }}-installer-x64.msi" "windows/tank.wxs"
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -106,11 +106,9 @@ jobs:
         with:
           submodules: recursive
       - name: Install dependencies
-        run: |
-          sudo apt-get install libwebkit2gtk-4.1-dev -y
-          cargo install cargo-bundle
+        run: cargo install cargo-bundle
       - name: Bundle
-        run: cargo bundle --release --target=x86_64-unknown-linux-gnu --format=deb
+        run: cargo bundle --release --bin tank --target=x86_64-unknown-linux-gnu --format=deb
       - name: Get Tag Name
         run: |
           echo "TAG_NAME=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV

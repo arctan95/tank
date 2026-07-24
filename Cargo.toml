@@ -14,7 +14,7 @@ crate-type = ["lib", "staticlib"]
 name = "matrix-saver"
 path = "screensaver/windows/matrix/main.rs"
 
-[package.metadata.bundle]
+[package.metadata.bundle.bin.tank]
 name = "Tank"
 identifier = "io.github.arctan95.tank"
 icon = ["assets/icons/32x32.png", "assets/icons/128x128.png", "assets/icons/128x128@2x.png"]
