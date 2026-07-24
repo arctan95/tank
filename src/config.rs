@@ -206,8 +206,24 @@ fn default_palette() -> PaletteSpec {
     ])
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) enum EffectKind {
+    None,
+    Plain,
+    Palette,
+    Mirror,
+}
+
+impl EffectKind {
+    pub(crate) fn is_none(self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct MatrixConfig {
+    pub(crate) effect: EffectKind,
     pub(crate) font: FontKind,
     pub(crate) base_texture: Option<TextureKind>,
     pub(crate) glint_texture: Option<TextureKind>,
@@ -262,6 +278,7 @@ impl Default for MatrixConfig {
     fn default() -> Self {
         let font = FontKind::MatrixCode.asset();
         Self {
+            effect: EffectKind::Palette,
             font: FontKind::MatrixCode,
             base_texture: None,
             glint_texture: None,
@@ -586,15 +603,24 @@ impl MatrixConfig {
     }
 
     pub(crate) fn grid_size(self) -> [u32; 2] {
-        let density = if self.volumetric { self.density } else { 1.0 };
+        let density = self.effective_density();
         [
             (self.num_columns as f32 * density).floor() as u32,
             self.num_columns,
         ]
     }
 
+    fn effective_density(self) -> f32 {
+        if self.volumetric && !self.effect.is_none() {
+            self.density
+        } else {
+            1.0
+        }
+    }
+
     pub(crate) fn to_rain_uniform(self) -> RainConfigUniform {
         let grid_size = self.grid_size();
+        let density = self.effective_density();
         let glyph_transform =
             Mat2::from_diagonal(Vec2::new(if self.glyph_flip { -1.0 } else { 1.0 }, 1.0))
                 * Mat2::from_angle(self.glyph_rotation_degrees.to_radians());
@@ -606,7 +632,7 @@ impl MatrixConfig {
             glyph_height_to_width: self.glyph_height_to_width,
             glyph_transform,
             grid_size: Vec2::new(grid_size[0] as f32, grid_size[1] as f32),
-            show_debug_view: 0,
+            show_debug_view: self.effect.is_none() as i32,
             brightness_threshold: self.brightness_threshold,
             brightness_override: self.brightness_override,
             brightness_decay: self.brightness_decay,
@@ -631,7 +657,7 @@ impl MatrixConfig {
             glyph_vertical_spacing: self.glyph_vertical_spacing,
             glyph_edge_crop: self.glyph_edge_crop,
             is_polar: self.is_polar as i32,
-            density: self.density,
+            density,
             slant_scale,
             slant_vec: Vec2::new(self.slant.cos(), self.slant.sin()),
             volumetric: self.volumetric as i32,
