@@ -1,0 +1,39 @@
+macos/matrix/project.yml
+  h_8fe4fb6ef5ced9 5
+src/saver.rs
+  s_c4f3482643bfff::t_71d7ff86e0b7ab 186,190,194,196-198,200
+  s_c4f3482643bfff::t_7daeea833f00b5 1-169,175,177-184,187-189,191,202-204
+  s_c4f3482643bfff::t_b6a0da1633a755 170-174,185,192,199
+  s_c4f3482643bfff::t_115bebdb894f9c 176,193,195,201
+.gitignore
+  s_c4f3482643bfff::t_a4a46f0ce67d18 3
+  s_c4f3482643bfff::t_9b8da05efdbc54 4-5
+  s_c4f3482643bfff::t_35d5cd241c8e7f 2,6
+Cargo.toml
+  s_c4f3482643bfff::t_63d7c83504c5d1 9-11,29
+src/lib.rs
+  s_c4f3482643bfff::t_9886c77e9933c6 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d584589a42d63b53fbc487b892d3f43312093003",
+  "prompts": {},
+  "humans": {
+    "h_8fe4fb6ef5ced9": {
+      "author": "arctan95 <jaeqentan@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_c4f3482643bfff": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a6378c3e69272e9f342ceeb",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": "arctan95 <jaeqentan@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
