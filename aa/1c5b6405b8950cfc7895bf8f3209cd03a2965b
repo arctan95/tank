@@ -1,0 +1,48 @@
+README.md
+  s_c4f3482643bfff::t_314b63a5ca35e3 26-28
+  s_c4f3482643bfff::t_6217277d007df4 29
+Cargo.toml
+  s_c4f3482643bfff::t_90a53594231402 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a639298e69272e9f342d5ec","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":3}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "aa1c5b6405b8950cfc7895bf8f3209cd03a2965b",
+  "prompts": {},
+  "sessions": {
+    "s_c4f3482643bfff": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a6378c3e69272e9f342ceeb",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {
+    "Cargo.toml": [
+      {
+        "hash": "s_c4f3482643bfff::t_90a53594231402",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a639298e69272e9f342d5ec",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {}
+}
