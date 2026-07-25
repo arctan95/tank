@@ -1,0 +1,79 @@
+name: matrix
+options:
+  bundleIdPrefix: io.github.arctan95
+  deploymentTarget:
+    macOS: "14.0"
+targets:
+  Matrix:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: matrix/MatrixView.swift
+      - path: matrix/thumbnail.png
+        buildPhase: resources
+      - path: matrix/thumbnail@2x.png
+        buildPhase: resources
+    info:
+      path: matrix/Info.plist
+      properties:
+        CFBundleDisplayName: Matrix
+        CFBundleName: Matrix
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: matrixView
+    preBuildScripts:
+      - name: Build Rust Renderer
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - ../../../target/release/libtank.a
+        script: |
+          set -e
+          cd ../../..
+          export MACOSX_DEPLOYMENT_TARGET=14.0
+
+          cargo build --release --lib
+    settings:
+      base:
+        PRODUCT_NAME: Matrix
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.arctan95.matrix
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        WRAPPER_EXTENSION: saver
+        COMBINE_HIDPI_IMAGES: false
+        ENABLE_USER_SCRIPT_SANDBOXING: false
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        SWIFT_OBJC_BRIDGING_HEADER: matrix/MatrixView.h
+        LIBRARY_SEARCH_PATHS:
+          - $(inherited)
+          - ../../../target/release
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -ltank
+          - -framework
+          - ScreenSaver
+          - -framework
+          - AppKit
+          - -framework
+          - Foundation
+          - -framework
+          - Metal
+          - -framework
+          - QuartzCore
+          - -framework
+          - CoreGraphics
+          - -framework
+          - CoreFoundation
+          - -framework
+          - CoreServices
+          - -framework
+          - Carbon
+          - -framework
+          - IOSurface
+          - -framework
+          - IOKit
+          - -framework
+          - Security
+          - -framework
+          - SystemConfiguration
+          - -lc++
+          - -lz
+          - -liconv
