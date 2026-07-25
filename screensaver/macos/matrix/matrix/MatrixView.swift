@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import Darwin
 import ScreenSaver
 
 private struct MatrixSettings {
@@ -69,6 +70,9 @@ private struct MatrixSettings {
 
 @objc(matrixView)
 final class MatrixView: ScreenSaverView {
+    private static let screenSaverWillStopNotification = Notification.Name("com.apple.screensaver.willstop")
+
+    private let previewMode: Bool
     private var renderer: UnsafeMutableRawPointer?
     private var lastBackingSize = CGSize.zero
     private var sheet: NSWindow?
@@ -77,16 +81,19 @@ final class MatrixView: ScreenSaverView {
     private var skipIntroCheckbox: NSButton?
 
     override init?(frame: NSRect, isPreview: Bool) {
+        previewMode = isPreview
         super.init(frame: frame, isPreview: isPreview)
         setup()
     }
 
     required init?(coder: NSCoder) {
+        previewMode = false
         super.init(coder: coder)
         setup()
     }
 
     deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
         stopRenderer()
     }
 
@@ -94,6 +101,15 @@ final class MatrixView: ScreenSaverView {
         animationTimeInterval = 1.0 / 60.0
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
+
+        if !previewMode {
+            DistributedNotificationCenter.default().addObserver(
+                self,
+                selector: #selector(screenSaverWillStop(_:)),
+                name: Self.screenSaverWillStopNotification,
+                object: nil
+            )
+        }
     }
 
     override func startAnimation() {
@@ -299,5 +315,10 @@ final class MatrixView: ScreenSaverView {
         } else {
             sheet.close()
         }
+    }
+
+    @objc private func screenSaverWillStop(_ notification: Notification) {
+        stopRenderer()
+        Darwin.exit(0)
     }
 }
