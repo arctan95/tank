@@ -6,6 +6,9 @@ edition = "2021"
 license = "Apache-2.0"
 description = "The Operator plugging you into The Matrix"
 
+[lib]
+crate-type = ["lib", "staticlib"]
+
 [package.metadata.bundle]
 name = "Tank"
 identifier = "io.github.arctan95.tank"
@@ -23,3 +26,4 @@ encase = "0.12"
 glam = { version = "0.30", features = ["bytemuck", "encase"] }
 image = "0.24"
 anyhow = "1.0"
+raw-window-handle = "0.6"
