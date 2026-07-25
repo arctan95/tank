@@ -1,0 +1,56 @@
+screensaver/macos/matrix/matrix/MatrixView.swift
+  s_c4f3482643bfff::t_e569b24c8605a0 3,73-75,84,90,96,104-112,319-322
+  s_c4f3482643bfff::t_44ba25877e4880 323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7dd8ff2de2a3da1286ef5e730664efaf4f797917",
+  "prompts": {},
+  "humans": {
+    "h_8fe4fb6ef5ced9": {
+      "author": "arctan95 <jaeqentan@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_c4f3482643bfff": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a6378c3e69272e9f342ceeb",
+        "model": "gpt-5.5__dev"
+      },
+      "human_author": "arctan95 <jaeqentan@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {
+    "s_c4f3482643bfff": {
+      "tool": "trae",
+      "conversation_id": "6a6378c3e69272e9f342ceeb",
+      "session_id": "6a6378c3e69272e9f342ceeb",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_c4f3482643bfff::t_1c1c068b98c5af": {
+      "tool": "trae",
+      "conversation_id": "6a6378c3e69272e9f342ceeb",
+      "session_id": "6a6378c3e69272e9f342ceeb",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_c4f3482643bfff::t_641e60b25cf0ca": {
+      "tool": "trae",
+      "conversation_id": "6a6378c3e69272e9f342ceeb",
+      "session_id": "6a6378c3e69272e9f342ceeb",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_c4f3482643bfff::t_e569b24c8605a0": {
+      "tool": "trae",
+      "conversation_id": "6a6378c3e69272e9f342ceeb",
+      "session_id": "6a6378c3e69272e9f342ceeb",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
