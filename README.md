@@ -41,3 +41,52 @@ sudo xattr -rd com.apple.quarantine /Applications/Tank.app
 Tank is released under the [Apache License, Version 2.0].
 
 [Apache License, Version 2.0]: https://github.com/arctan95/tank/blob/master/LICENSE
+
+## Windows Screen Saver
+
+Tank can also run as a native Windows screen saver (`.scr`). The screen saver
+binary (`src/bin/saver.rs`) is a standalone GUI program that reuses the exact
+same WGPU Matrix renderer as the desktop app. Because the Windows lock screen is
+a protected session, third-party visuals cannot be drawn on top of it — a screen
+saver runs in the idle session *before* the lock, which is the standard Windows
+equivalent.
+
+> Note: the macOS screen saver lives under `screensaver/macos`; the Windows
+> `.scr` is built separately from `src/bin/saver.rs` and shares the renderer, not
+> the bundle.
+
+### Build
+
+From a PowerShell prompt (requires the Windows + Rust toolchains):
+
+```powershell
+.\build-scr.ps1          # debug build -> ./tank.scr
+.\build-scr.ps1 -Release # release build -> ./tank.scr
+```
+
+This compiles the `saver` binary (`cargo build --bin saver`) and copies it to
+`tank.scr` in the project root.
+
+### Install
+
+1. Copy `tank.scr` into `%SystemRoot%\System32` (e.g. `C:\Windows\System32`).
+   Administrative rights are required.
+2. Right-click `tank.scr` (in `System32` or the project root) and choose
+   **Install**, or open **Screen Saver Settings** (run `desk.cpl`, or search
+   "screen saver" in the Start menu) and select **Tank Matrix Saver** from the
+   dropdown.
+3. Configure it with the **Settings** button (this launches `tank.scr /c`). The
+   settings dialog was previously crashing on open; it now uses a dedicated
+   window class so it no longer dismisses itself when the mouse moves or a
+   button is clicked.
+
+### Command line switches
+
+- `tank.scr /s` — run full screen.
+- `tank.scr /p <HWND>` — render a preview inside the given parent window.
+- `tank.scr /c` — open the settings dialog (version, mirror effect, skip intro).
+  `tank.scr /c:<HWND>` is the same dialog owned by the parent window provided by
+  the control panel.
+  Settings are persisted under `HKCU\Software\Tank\Screensaver`.
+
+Any mouse movement, click or keypress dismisses the running screen saver.
