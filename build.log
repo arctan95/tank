@@ -1,0 +1,28 @@
+﻿cargo :    Compiling tank v1.0.0 (D:\ele\tank)
+所在位置 行:1 字符: 221
++ ... ::UTF8; $env:WSL_UTF8 = '1'; cd d:/ele/tank; cargo build 2>&1 | Out-F ...
++                                                  ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling tank v1.0.0 (D:\ele\tank):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: struct `SaverSettings` is never constructed
+ --> src\saver.rs:4:19
+  |
+4 | pub(crate) struct SaverSettings {
+  |                   ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated items `new` and `config` are never used
+  --> src\saver.rs:11:19
+   |
+10 | impl SaverSettings {
+   | ------------------ associated items in this implementation
+11 |     pub(crate) fn new(version: &str, mirror_enabled: bool, skip_intro: bool) -> Self {
+   |                   ^^^
+...
+19 |     pub(crate) fn config(&self) -> MatrixConfig {
+   |                   ^^^^^^
+
+warning: `tank` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.87s
