@@ -1,3 +1,33 @@
+use crate::config::{EffectKind, MatrixConfig};
+
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct SaverSettings {
+    version: String,
+    mirror_enabled: bool,
+    skip_intro: bool,
+}
+
+impl SaverSettings {
+    pub(crate) fn new(version: &str, mirror_enabled: bool, skip_intro: bool) -> Self {
+        Self {
+            version: version.to_owned(),
+            mirror_enabled,
+            skip_intro,
+        }
+    }
+
+    pub(crate) fn config(&self) -> MatrixConfig {
+        let mut config = MatrixConfig::for_version(&self.version);
+        config.effect = if self.mirror_enabled {
+            EffectKind::Mirror
+        } else {
+            EffectKind::Palette
+        };
+        config.skip_intro = self.skip_intro;
+        config
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod macos {
     use std::{
@@ -13,10 +43,11 @@ mod macos {
     };
 
     use crate::{
-        config::{EffectKind, MatrixConfig},
         gpu::{uniform_bytes, uniform_size},
         pipeline::MatrixPipeline,
     };
+
+    use super::SaverSettings;
 
     struct AppKitViewHandle {
         ns_view: NonNull<c_void>,
@@ -46,13 +77,6 @@ mod macos {
         start_time: Instant,
         frames: i32,
         pipeline: MatrixPipeline,
-    }
-
-    #[derive(Clone, PartialEq, Eq)]
-    struct SaverSettings {
-        version: String,
-        mirror_enabled: bool,
-        skip_intro: bool,
     }
 
     impl SaverState {
@@ -210,27 +234,6 @@ mod macos {
             self.queue.submit([encoder.finish()]);
             surface_texture.present();
             self.frames += 1;
-        }
-    }
-
-    impl SaverSettings {
-        fn new(version: &str, mirror_enabled: bool, skip_intro: bool) -> Self {
-            Self {
-                version: version.to_owned(),
-                mirror_enabled,
-                skip_intro,
-            }
-        }
-
-        fn config(&self) -> MatrixConfig {
-            let mut config = MatrixConfig::for_version(&self.version);
-            config.effect = if self.mirror_enabled {
-                EffectKind::Mirror
-            } else {
-                EffectKind::Palette
-            };
-            config.skip_intro = self.skip_intro;
-            config
         }
     }
 
