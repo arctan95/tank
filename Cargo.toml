@@ -27,3 +27,17 @@ glam = { version = "0.30", features = ["bytemuck", "encase"] }
 image = "0.24"
 anyhow = "1.0"
 raw-window-handle = "0.6"
+
+[[bin]]
+name = "saver"
+path = "src/bin/saver.rs"
+required-features = []
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Controls",
+    "Win32_System_Registry",
+] }
