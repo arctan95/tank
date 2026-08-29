@@ -5,9 +5,14 @@ authors = ["arctan95"]
 edition = "2021"
 license = "Apache-2.0"
 description = "The Operator plugging you into The Matrix"
+build = "screensaver/windows/matrix/build.rs"
 
 [lib]
 crate-type = ["lib", "staticlib"]
+
+[[bin]]
+name = "matrix-saver"
+path = "screensaver/windows/matrix/main.rs"
 
 [package.metadata.bundle]
 name = "Tank"
@@ -18,7 +23,7 @@ copyright = "Copyright (c) 2025 arctan95. All rights reserved."
 [dependencies]
 chrono = "0.4"
 env_logger = "0.11"
-wgpu = "28.0"
+wgpu = "29.0.4"
 winit = "0.30"
 pollster = "0.4"
 bytemuck = { version = "1.23", features = ["derive"] }
@@ -27,3 +32,15 @@ glam = { version = "0.30", features = ["bytemuck", "encase"] }
 image = "0.24"
 anyhow = "1.0"
 raw-window-handle = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winreg = "0.55"
+
+[build-dependencies]
+embed-resource = "3.0"
