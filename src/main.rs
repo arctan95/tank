@@ -36,12 +36,15 @@ impl ApplicationHandler for App {
                 .create_window(
                     Window::default_attributes()
                         .with_title("Matrix")
+                        .with_visible(false)
                         .with_fullscreen(Some(Fullscreen::Borderless(None))),
                 )
                 .unwrap(),
         );
 
-        let state = pollster::block_on(State::new(window.clone()));
+        let mut state = pollster::block_on(State::new(window.clone()));
+        window.set_visible(true);
+        state.render();
         self.state = Some(state);
 
         window.request_redraw();
