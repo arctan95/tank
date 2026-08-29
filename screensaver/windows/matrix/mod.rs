@@ -152,7 +152,7 @@ impl ApplicationHandler for SaverApp {
         }
 
         let attributes = match window_attributes(self.mode) {
-            Ok(attributes) => attributes,
+            Ok(attributes) => attributes.with_visible(false),
             Err(error) => {
                 show_error(&format!("{error:#}"));
                 event_loop.exit();
@@ -186,7 +186,7 @@ impl ApplicationHandler for SaverApp {
             }
         };
         let size = window.inner_size();
-        let state = match SaverState::new(
+        let mut state = match SaverState::new(
             &instance,
             surface,
             size.width,
@@ -203,12 +203,14 @@ impl ApplicationHandler for SaverApp {
             }
         };
 
+        window.set_visible(true);
+        state.render(|| window.pre_present_notify());
+
         self.started_at = Instant::now();
-        self.next_frame = self.started_at;
-        self.window = Some(window.clone());
+        self.next_frame = self.started_at + FRAME_INTERVAL;
+        self.window = Some(window);
         self.state = Some(state);
-        window.request_redraw();
-        self.redraw_pending = true;
+        self.redraw_pending = false;
     }
 
     fn window_event(
