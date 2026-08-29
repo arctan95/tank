@@ -162,13 +162,15 @@ impl SaverState {
 
     pub(crate) fn render(&mut self, before_present: impl FnOnce()) {
         let surface_texture = match self.surface.get_current_texture() {
-            Ok(texture) => texture,
-            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+            wgpu::CurrentSurfaceTexture::Success(texture)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
+            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
                 self.surface.configure(&self.device, &self.surface_config);
                 return;
             }
-            Err(wgpu::SurfaceError::Timeout) => return,
-            Err(wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other) => return,
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => return,
         };
         let surface_view = surface_texture
             .texture
@@ -257,7 +259,7 @@ mod macos {
         settings: SaverSettings,
     ) -> anyhow::Result<SaverState> {
         let ns_view = NonNull::new(ns_view).ok_or_else(|| anyhow::anyhow!("null NSView"))?;
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let view_handle = AppKitViewHandle { ns_view };
         let surface = unsafe {
             instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::from_window(&view_handle)?)?

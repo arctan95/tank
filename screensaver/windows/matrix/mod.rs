@@ -174,7 +174,7 @@ impl ApplicationHandler for SaverApp {
             window.set_cursor_visible(false);
         }
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = match instance.create_surface(window.clone()) {
             Ok(surface) => surface,
             Err(error) => {

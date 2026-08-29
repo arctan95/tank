@@ -23,7 +23,7 @@ copyright = "Copyright (c) 2025 arctan95. All rights reserved."
 [dependencies]
 chrono = "0.4"
 env_logger = "0.11"
-wgpu = "28.0"
+wgpu = "29.0.4"
 winit = "0.30"
 pollster = "0.4"
 bytemuck = { version = "1.23", features = ["derive"] }
