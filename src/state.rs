@@ -26,7 +26,7 @@ pub struct State {
 
 impl State {
     pub async fn new(window: Arc<Window>) -> State {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let surface = instance.create_surface(window.clone()).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -189,14 +189,15 @@ impl State {
 
     pub fn render(&mut self) {
         let surface_texture = match self.surface.get_current_texture() {
-            Ok(texture) => texture,
-            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+            wgpu::CurrentSurfaceTexture::Success(texture)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
+            wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
                 self.configure_surface();
                 return;
             }
-            Err(wgpu::SurfaceError::Timeout) => return,
-            Err(wgpu::SurfaceError::OutOfMemory) => panic!("surface is out of memory"),
-            Err(wgpu::SurfaceError::Other) => return,
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => return,
         };
         let surface_view = surface_texture
             .texture
