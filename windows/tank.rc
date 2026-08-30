@@ -1,0 +1,7 @@
+// Embed the Tank application icon in the Windows executable.
+
+#include <windows.h>
+
+#define IDI_TANK 101
+
+IDI_TANK ICON "assets/icons/tank.ico"
