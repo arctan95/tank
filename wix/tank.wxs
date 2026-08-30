@@ -4,7 +4,7 @@
     UpgradeCode="949A3340-E69A-424B-B559-D38F9FC8074B"
     Language="1033"
     Codepage="1252"
-    Version="0.1.0"
+    Version="1.0.0"
     Manufacturer="arctan95"
     InstallerVersion="200">
 
@@ -40,7 +40,9 @@
           Id="TankShortcutFile"
           Name="Tank"
           Description="The Operator plugging you into The Matrix"
-          Target="[TankProgramFiles]tank.exe" />
+          Target="[TankProgramFiles]tank.exe"
+          Icon="TankIco"
+          IconIndex="0" />
         <RemoveFolder Id="TankProgramMenu" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\Microsoft\Tank" Name="installed" Type="integer" Value="1" KeyPath="yes" />
       </Component>
